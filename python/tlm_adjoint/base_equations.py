@@ -36,7 +36,6 @@ __all__ = \
         "AdjointRHS",
 
         "Equation",
-        "EquationAlias",
 
         "ControlsMarker",
         "FunctionalMarker",
@@ -564,16 +563,30 @@ class Equation:
         raise EquationException("Method not overridden")
 
 
-class EquationAlias:
-    def __init__(self, eq):
-        super().__setattr__("_tlm_adjoint__alias__dict__", eq.__dict__)
-        super().__setattr__("_tlm_adjoint__alias__str__",
-                            f"{type(eq).__name__:s} (aliased)")
+class Alias:
+    """
+    Alias of obj, holding no reference to obj, and valid after deallocation of
+    obj. Intended to be used in combination with weakref.finalize(obj, ...).
+    """
+
+    def __init__(self, obj):
+        if hasattr(obj, "__slots__"):
+            # Weak references to obj not possible, has attributes not
+            # accessible via __dict__ attribute
+            raise EquationException("Cannot alias object with __slots__ "
+                                    "attribute")
+        if isinstance(obj, Alias):
+            raise EquationException("Cannot alias Alias")
+        super().__setattr__("_tlm_adjoint__alias__dict__", obj.__dict__)
 
     def __new__(cls, obj):
-        class EquationAlias(cls, type(obj)):
+        obj_cls = type(obj)
+
+        class Alias(cls, obj_cls):
             pass
-        return super().__new__(EquationAlias)
+
+        Alias.__name__ = f"{obj_cls.__name__:s}Alias"
+        return super().__new__(Alias)
 
     def __str__(self):
         return self._tlm_adjoint__alias__str__
